@@ -235,7 +235,13 @@ This data model is not convenient for a database, we will have to switch to a lo
 ### Data cleaning
 
 ```{r}
-species_long <- 
+species_long <- species_csv |> 
+  pivot_longer(
+    cols = !c(Year, Site, Date, Jdate, Num_observers, All_obs_reported, Observer_hours),
+    names_to = "species", 
+    values_to = "species_count",
+    values_transform = list(species_count = as.character)
+  )
 ```
 
 
@@ -243,6 +249,7 @@ We want to focus on the presence and absence of species and not the count. Let's
 
 ```{r}
 species_presence <- species_long %>%
+   mutate(species_presence = ifelse(species_count == "0", 0, 1))
   
 ```
 
@@ -250,6 +257,7 @@ We can remove some columns: "Num_observers", "All_obs_reported", "Observer_hours
 
 ```{r}
 species_presence <- species_presence %>%
+
   
 
 ```
