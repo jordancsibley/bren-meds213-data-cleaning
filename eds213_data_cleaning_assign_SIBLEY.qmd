@@ -1,0 +1,39 @@
+---
+title: "Week 2 Assignment - Data Cleaning"
+author: "Jordan Sibley" 
+date: "04/16/2025"
+format: html
+---
+
+## Overview
+
+We cleaned the Snow_cover column during class. Inspiring yourself from the steps we followed, do the following in a quarto document:
+
+1.  Clean the Water_cover column to transform it into the correct data type and respect expectations for a percentage
+
+2.  Clean the Land_cover column to transform it into the correct data type and respect expectations for a percentage
+
+3.  Use the relationship between the three cover columns (Snow, Water, Land) to infer missing values where possible and recompute the Total_cover column as needed
+
+Add comments to your quarto document about your decisions and assumptions, this will be a large part of the grading. 
+
+#### The expectations are:
+- The Quarto document eds213_data_cleaning_assign_YOURNAME.qmd should run if your repo is cloned locally (5 pts; Reproducibility)
+- The code should output a csv file named all_cover_fixed_YOURNAME.csv in the data/processed folder (5 pts; Code)
+- Comment your code well (10 pts; Documentation)
+- Your quarto document should provide all the necessary explanations about your decisions and discuss any assumptions you made (don’t forget to look at the metadata!) (30 pts; Documentation)
+- The code should perform the 3 data cleaning steps describe above to enable ingestion into a database (50 pts; Technical concepts)
+
+
+## Data 
+
+This data has been pre processed to correct the `Snow_cover` column 
+
+```{r}
+# Load packages 
+library(tidyverse)
+library(here)
+
+Snow_cover <- read.csv(here("data", "processed", "snow_cover.csv"))
+```
+
