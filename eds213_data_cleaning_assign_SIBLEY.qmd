@@ -34,6 +34,175 @@ This data has been pre processed to correct the `Snow_cover` column
 library(tidyverse)
 library(here)
 
-Snow_cover <- read.csv(here("data", "processed", "snow_cover.csv"))
+snow_df <- read.csv(here("data", "processed", "snow_cover.csv"))
+```
+
+## Explore data set 
+```{r}
+# View first rows of data frame 
+glimpse(snow_df)
+
+# Show summary of columns + discover data types 
+summary(snow_df)
+
+# Count NA values in each column 
+colSums(is.na(snow_df))
+```
+
+After taking a look at some of the aspects of the data here is what I observed: 
+
+Both the `Water_cover`, `Land_cover`, and `Total_cover` columns are `character` data types when the values should likely by numeric. It makes me think that are values in these columns that are not numbers and are likely different ways of denoting a NA value 
+
+## Data cleaning 
+
+### Fixing the `Water_cover` column 
+
+To fix this column, I need to identify how NA values are presented and standardize them, and I need to ensure that the values make sense in the context of the data (no negative numbers, no values larger than 100), and finally I need to convert the column to a numeric data type 
+
+
+```{r}
+# Find non-numeric values in Water_cover column
+snow_df %>%
+  mutate(Water_cover_num = as.numeric(Water_cover)) %>%
+  filter(is.na(Water_cover_num)) %>% # only keep failed (NA) values 
+  count(Water_cover)
+```
+
+While there are 149 true `NA` values, there are also some other characters that are trying to denote a NA value but were not inputted correctly. I am going to convert these values to NA. 
+
+```{r}
+# Fix NA of Water_cover column 
+snow_df_fix <- snow_df |> 
+  mutate(Water_cover = ifelse(Water_cover %in% c("-", ".", "n/a", "unk"), NA, Water_cover))
+
+# Check values were fixed
+snow_df_fix %>%
+  mutate(Water_cover_num = as.numeric(Water_cover)) %>%
+  filter(is.na(Water_cover_num)) %>%
+  count(Water_cover)
+```
+
+All of the characters were converted to NA. Now I can convert the column to the correct numeric data type 
+
+```{r}
+# Convert Water_cover from character to numeric 
+snow_df_fix <- snow_df_fix |> 
+  mutate(Water_cover = as.numeric(Water_cover))
+```
+
+Now that the column is recognized as a numeric data type, I will check that all the values are between 0 and 100 
+
+```{r}
+# Filter to values in Water_cover outside of the range 0-100
+snow_df_fix |> 
+  filter(Water_cover > 100 | Water_cover < 0)
+```
+
+One row is outside of the correct range, with the Water_cover value being 353. I can't determine what the correct value should have been, so to be safe I am just going to remove this row. 
+
+```{r}
+# Remove rows that fall outside of 0-100 range, but still keep NA values 
+snow_df_fix <- snow_df_fix |> 
+  filter(is.na(Water_cover) |Water_cover >= 0 & Water_cover <= 100)
+
+# Check range of Water_cover row 
+range(snow_df_fix$Water_cover, na.rm = TRUE)
+```
+
+Now the `Water_cover` column looks in good shape! Since it seems the `Land_cover` column is suffering from some of the same issues, I will repeat the same work flow to clean up this column 
+
+### Fixing the `Land_cover` Column 
+
+```{r}
+# Find non-numeric values in Land_cover column
+snow_df_fix %>%
+  mutate(Land_cover_num = as.numeric(Land_cover)) %>%
+  filter(is.na(Land_cover_num)) %>%
+  count(Land_cover)
+```
+
+It looks like this column has some of the same incorrectly labeled NA values as Water_cover had  
+
+```{r}
+# Fix NA of Land_cover column 
+snow_df_fix <- snow_df_fix |> 
+   mutate(Land_cover = ifelse(Land_cover %in% c("-", ".", "n/a", "unk"), NA, Land_cover))
+
+# Check values were fixed
+snow_df_fix %>%
+  mutate(Land_cover_num = as.numeric(Land_cover)) %>%
+  filter(is.na(Land_cover_num)) %>%
+  count(Land_cover)
+```
+
+```{r}
+# Convert Land_cover from character to numeric 
+snow_df_fix <- snow_df_fix |> 
+  mutate(Land_cover = as.numeric(Land_cover))
+
+# Filter to values in Land_cover outside of the range 0-100
+snow_df_fix |> 
+  filter(Land_cover > 100 | Land_cover < 0)
+```
+
+There is 1 row that falls outside of of the 0-100 range with Land_cover = -100. With Snow_cover for that row being NA, Water_cover being equal to 0, and total_cover is equal to 100, I can make the assumption that the actual value for Land_cover should be 100. 
+
+```{r}
+# Convert -100 value in Land_cover to 100 
+snow_df_fix <- snow_df_fix |> 
+  mutate(Land_cover = ifelse(Land_cover == -100, 100, Land_cover))
+
+# Check that range of Land_cover is between 0-100
+range(snow_df_fix$Land_cover, na.rm = TRUE)
+```
+
+
+## Fixing the `Total_cover` column 
+
+According to the metadata, the value of the `Total_cover` column should be the sum of the snow, water, and land cover columns, and should add up to 100. Based on the way the other column looked and the fact that this column is a character data type, we should check if this is in fact true.
+
+```{r}
+# Check the range of the Total_cover column 
+range(snow_df_fix$Total_cover, na.rm = TRUE)
+
+# Check for non_numeric values in Total_cover column
+snow_df_fix %>%
+  mutate(Total_cover_num = as.numeric(Total_cover)) %>%
+  filter(is.na(Total_cover_num)) %>%  
+  count(Total_cover)
+```
+
+Since there are some weird unassigned NA values, I will create a new column that is just the sum of the other three columns that have already been cleaned up. 
+
+```{r}
+# Create new Total_cover column that is the sum of snow, water, and land cover 
+snow_df_fix <- snow_df_fix |> 
+  mutate(Total_cover_new = Snow_cover + Water_cover + Land_cover)
+
+# View rows of Total_cover_new that are not equal to 100 
+incorrect_total_cover <-  snow_df_fix |> 
+  filter(Total_cover_new != 100)
+
+glimpse(incorrect_total_cover)
+```
+
+It seems there are 4,573 instances where `Total_cover_new` does not add up to 100. I think the smartest strategy that doesn't make any wrong assumptions about the value of the other columns is to make any value in the column that does not add up to 100 to be NA. That way, when you are looking at the data, the values of the other columns are still there (which doesn't remove the data) but since the total cover will not add up to 100, you can easily parse these rows out. 
+
+```{r}
+# Turn any non 100 value of Total_cover to NA 
+snow_df_fix <- snow_df_fix |> 
+  mutate(Total_cover = ifelse(Total_cover_new != 100, NA, Total_cover_new)) |> 
+  select(-Total_cover_new) # Remove this column for matching original column names 
+
+# Check there are no non 100 values in Total_cover 
+snow_df_fix |> 
+  filter(Total_cover != 100)
+```
+
+## Save new cleaned data set 
+
+```{r}
+# Write out cleaned data to csv file
+write.csv(snow_df_fix, here("data", "processed", "all_cover_fixed_SIBLEY.csv"), row.names = FALSE)
 ```
 
