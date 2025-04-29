@@ -172,32 +172,49 @@ snow_df_fix %>%
   count(Total_cover)
 ```
 
-Since there are some weird unassigned NA values, I will create a new column that is just the sum of the other three columns that have already been cleaned up. 
+Since there are some weird unassigned NA values, I will create a new column that is just the sum of the other three columns that have already been cleaned up. I also will help compute missing values ff two of the three values are present and sum to ≤ 100, then I can infer the third. Once I do this, then I can recalculate the Total_cover column, and any values that are not equal to 100, I will just set as NA. 
 
 ```{r}
-# Create new Total_cover column that is the sum of snow, water, and land cover 
+# Create new total_cover column that is the sum of the 3 land classification columns 
 snow_df_fix <- snow_df_fix |> 
   mutate(Total_cover_new = Snow_cover + Water_cover + Land_cover)
 
-# View rows of Total_cover_new that are not equal to 100 
+# Infer NA values based on values of other columns (if two have real values, and 1 is NA)
+snow_df_fix <- snow_df_fix |> 
+  rowwise() |> 
+  mutate(
+    Snow_cover = ifelse(is.na(Snow_cover) & !is.na(Water_cover) & !is.na(Land_cover), 
+                        100 - Water_cover - Land_cover, Snow_cover),
+    Water_cover = ifelse(is.na(Water_cover) & !is.na(Snow_cover) & !is.na(Land_cover), 
+                         100 - Snow_cover - Land_cover, Water_cover),
+    Land_cover = ifelse(is.na(Land_cover) & !is.na(Snow_cover) & !is.na(Water_cover), 
+                        100 - Snow_cover - Water_cover, Land_cover)
+  ) |> 
+  ungroup()
+
+# Recompute Total_cover_new now that some NAs are filled
+snow_df_fix <- snow_df_fix |> 
+  mutate(Total_cover_new = Snow_cover + Water_cover + Land_cover)
+
+# See how many rows in Total_cover_new do not have values = 100
 incorrect_total_cover <-  snow_df_fix |> 
   filter(Total_cover_new != 100)
 
 glimpse(incorrect_total_cover)
-```
 
-It seems there are 4,573 instances where `Total_cover_new` does not add up to 100. I think the smartest strategy that doesn't make any wrong assumptions about the value of the other columns is to make any value in the column that does not add up to 100 to be NA. That way, when you are looking at the data, the values of the other columns are still there (which doesn't remove the data) but since the total cover will not add up to 100, you can easily parse these rows out. 
 
-```{r}
-# Turn any non 100 value of Total_cover to NA 
+# Return NA to Total_cover_new values that do not equal 100 
 snow_df_fix <- snow_df_fix |> 
-  mutate(Total_cover = ifelse(Total_cover_new != 100, NA, Total_cover_new)) |> 
-  select(-Total_cover_new) # Remove this column for matching original column names 
+  mutate(
+    Total_cover = ifelse(Total_cover_new == 100, Total_cover_new, NA)
+  ) |> 
+  select(-Total_cover_new)# Remove this column for matching original column names 
 
 # Check there are no non 100 values in Total_cover 
 snow_df_fix |> 
-  filter(Total_cover != 100)
+  filter(Total_cover != 100) # No values that are not 100
 ```
+
 
 ## Save new cleaned data set 
 
